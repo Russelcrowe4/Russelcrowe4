@@ -1,0 +1,664 @@
+Perfekt! Hier ist die **vereinfachte Version** nur mit dem **10-Pumpen-System** für **Russelcrowe4** - **2025-06-04 17:17:22 UTC**:
+
+## 🔧 Arduino Mega Sketch - Nur 10-Pumpen-System
+
+```cpp
+/*
+ * ===============================================
+ * ULTIMATE COCKTAILMASCHINE - ARDUINO MEGA 2560
+ * ===============================================
+ * 
+ * VEREINFACHTE VERSION: Nur 10-Pumpen-System
+ * Hardware Controller für Raspberry Pi 4 Integration
+ * 
+ * Version: 6.0.0 - Simplified
+ * Build: 2025-06-04 17:17:22 UTC
+ * User: Russelcrowe4
+ * Hardware: Arduino Mega 2560 + 10 Pumpen + Relais
+ * 
+ * GPIO-Mapping:
+ * - Pumpen: Digital Pins 22-31 (10 Pumpen)
+ * - Emergency Stop: Pin 2 (Interrupt)
+ * - Status LED: Pin 13 (Built-in)
+ * - Serial Communication: USB (9600 baud)
+ * 
+ * Communication Protocol:
+ * Commands from Raspberry Pi:
+ * - PUMP_ON:<id>        - Pumpe einschalten
+ * - PUMP_OFF:<id>       - Pumpe ausschalten
+ * - PUMP_TIMER:<id>:<ms> - Pumpe für X Millisekunden
+ * - ALL_PUMPS_OFF       - Alle Pumpen ausschalten
+ * - EMERGENCY_STOP      - Notfall-Stopp
+ * - STATUS              - System-Status abrufen
+ * - PING                - Verbindung testen
+ * 
+ */
+
+#include <Arduino.h>
+
+// ===== HARDWARE KONFIGURATION =====
+// Pumpen (Digital Output Pins)
+const int PUMP_PINS[] = {22, 23, 24, 25, 26, 27, 28, 29, 30, 31};
+const int NUM_PUMPS = 10;
+
+// Built-in LED für Status
+const int STATUS_LED_PIN = 13;
+
+// Emergency Stop Button
+const int EMERGENCY_STOP_PIN = 2; // Interrupt Pin
+
+// ===== SYSTEM VARIABLEN =====
+bool pumpStates[NUM_PUMPS];
+unsigned long pumpStartTimes[NUM_PUMPS];
+unsigned long pumpTimers[NUM_PUMPS]; // Timer für automatisches Ausschalten
+bool emergencyStopActive = false;
+unsigned long lastStatusSend = 0;
+unsigned long systemStartTime = 0;
+unsigned long lastHeartbeat = 0;
+
+// Communication
+String inputBuffer = "";
+
+// Pumpen-Namen für Russelcrowe4
+const String PUMP_NAMES[] = {
+  "Weißer Rum",
+  "Gin", 
+  "Vodka",
+  "Whiskey",
+  "Tequila",
+  "Säfte Mix",
+  "Sirupe",
+  "Liköre",
+  "Bitter",
+  "Sodawasser"
+};
+
+// ===== SETUP FUNKTION =====
+void setup() {
+  // Serial Communication für Raspberry Pi
+  Serial.begin(9600);
+  Serial.setTimeout(100);
+  
+  // System-Start Zeit
+  systemStartTime = millis();
+  
+  // Status LED
+  pinMode(STATUS_LED_PIN, OUTPUT);
+  digitalWrite(STATUS_LED_PIN, LOW);
+  
+  // Pumpen-Pins als Output konfigurieren
+  for (int i = 0; i < NUM_PUMPS; i++) {
+    pinMode(PUMP_PINS[i], OUTPUT);
+    digitalWrite(PUMP_PINS[i], LOW); // Relais sind normalerweise LOW = AUS
+    pumpStates[i] = false;
+    pumpStartTimes[i] = 0;
+    pumpTimers[i] = 0;
+  }
+  
+  // Emergency Stop mit Interrupt
+  pinMode(EMERGENCY_STOP_PIN, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(EMERGENCY_STOP_PIN), emergencyStopISR, FALLING);
+  
+  // Startup-Sequenz
+  startupSequence();
+  
+  // System bereit melden
+  Serial.println("{\"system\":\"ready\",\"time\":\"2025-06-04 17:17:22\",\"user\":\"Russelcrowe4\",\"hardware\":\"Arduino Mega 2560\",\"version\":\"6.0.0-Simplified\",\"pumps\":10}");
+  Serial.flush();
+}
+
+// ===== MAIN LOOP =====
+void loop() {
+  // Serial Commands verarbeiten
+  handleSerialCommands();
+  
+  // Pumpen-Timer überwachen
+  handlePumpTimers();
+  
+  // Status LED blinken lassen (Heartbeat)
+  handleHeartbeat();
+  
+  // Status regelmäßig senden (alle 10 Sekunden)
+  if (millis() - lastStatusSend > 10000) {
+    sendSystemStatus();
+    lastStatusSend = millis();
+  }
+  
+  // Emergency Stop überwachen
+  if (emergencyStopActive) {
+    handleEmergencyStop();
+  }
+  
+  // Kleine Verzögerung für Stabilität
+  delay(10);
+}
+
+// ===== STARTUP SEQUENZ =====
+void startupSequence() {
+  Serial.println("{\"message\":\"🚀 Arduino Mega 2560 Startup für Russelcrowe4 - Nur Pumpen-System\",\"time\":\"2025-06-04 17:17:22\"}");
+  
+  // Status LED blinken lassen
+  for (int i = 0; i < 5; i++) {
+    digitalWrite(STATUS_LED_PIN, HIGH);
+    delay(200);
+    digitalWrite(STATUS_LED_PIN, LOW);
+    delay(200);
+  }
+  
+  // Kurzer Test aller Pumpen (sehr kurz, nur Signal-Test)
+  Serial.println("{\"message\":\"Teste alle 10 Pumpen-Relais...\"}");
+  for (int i = 0; i < NUM_PUMPS; i++) {
+    digitalWrite(PUMP_PINS[i], HIGH);
+    delay(50); // Nur 50ms zum Testen
+    digitalWrite(PUMP_PINS[i], LOW);
+    delay(50);
+  }
+  
+  digitalWrite(STATUS_LED_PIN, HIGH); // LED an = bereit
+  
+  Serial.println("{\"message\":\"✅ 10-Pumpen-System für Russelcrowe4 bereit\",\"pumps_tested\":10}");
+}
+
+// ===== SERIAL COMMAND HANDLER =====
+void handleSerialCommands() {
+  while (Serial.available()) {
+    char c = Serial.read();
+    
+    if (c == '\n' || c == '\r') {
+      if (inputBuffer.length() > 0) {
+        processCommand(inputBuffer);
+        inputBuffer = "";
+      }
+    } else {
+      inputBuffer += c;
+    }
+  }
+}
+
+void processCommand(String command) {
+  command.trim();
+  
+  if (command == "PING") {
+    Serial.println("{\"response\":\"PONG\",\"time\":\"2025-06-04 17:17:22\",\"user\":\"Russelcrowe4\",\"uptime\":" + String(millis() - systemStartTime) + "}");
+    
+  } else if (command == "STATUS") {
+    sendSystemStatus();
+    
+  } else if (command == "ALL_PUMPS_OFF") {
+    stopAllPumps();
+    
+  } else if (command == "EMERGENCY_STOP") {
+    triggerEmergencyStop();
+    
+  } else if (command == "EMERGENCY_RESET") {
+    resetEmergencyStop();
+    
+  } else if (command.startsWith("PUMP_ON:")) {
+    int pumpId = command.substring(8).toInt() - 1;
+    if (pumpId >= 0 && pumpId < NUM_PUMPS) {
+      turnOnPump(pumpId);
+    }
+    
+  } else if (command.startsWith("PUMP_OFF:")) {
+    int pumpId = command.substring(9).toInt() - 1;
+    if (pumpId >= 0 && pumpId < NUM_PUMPS) {
+      turnOffPump(pumpId);
+    }
+    
+  } else if (command.startsWith("PUMP_TIMER:")) {
+    // Format: PUMP_TIMER:id:milliseconds
+    int firstColon = command.indexOf(':', 11);
+    if (firstColon > 0) {
+      int pumpId = command.substring(11, firstColon).toInt() - 1;
+      unsigned long duration = command.substring(firstColon + 1).toInt();
+      
+      if (pumpId >= 0 && pumpId < NUM_PUMPS && duration > 0) {
+        turnOnPumpWithTimer(pumpId, duration);
+      }
+    }
+    
+  } else {
+    Serial.println("{\"error\":\"Unknown command\",\"command\":\"" + command + "\",\"time\":\"2025-06-04 17:17:22\"}");
+  }
+}
+
+// ===== PUMPEN-STEUERUNG =====
+void turnOnPump(int pumpId) {
+  if (emergencyStopActive) {
+    Serial.println("{\"error\":\"Emergency stop active\",\"pump\":" + String(pumpId + 1) + "}");
+    return;
+  }
+  
+  digitalWrite(PUMP_PINS[pumpId], HIGH);
+  pumpStates[pumpId] = true;
+  pumpStartTimes[pumpId] = millis();
+  pumpTimers[pumpId] = 0; // Kein Timer = läuft dauerhaft
+  
+  Serial.println("{\"pump_on\":" + String(pumpId + 1) + ",\"name\":\"" + PUMP_NAMES[pumpId] + "\",\"pin\":" + String(PUMP_PINS[pumpId]) + ",\"time\":\"2025-06-04 17:17:22\",\"user\":\"Russelcrowe4\"}");
+}
+
+void turnOffPump(int pumpId) {
+  digitalWrite(PUMP_PINS[pumpId], LOW);
+  pumpStates[pumpId] = false;
+  
+  unsigned long runTime = millis() - pumpStartTimes[pumpId];
+  pumpTimers[pumpId] = 0;
+  
+  Serial.println("{\"pump_off\":" + String(pumpId + 1) + ",\"name\":\"" + PUMP_NAMES[pumpId] + "\",\"runtime\":" + String(runTime) + ",\"time\":\"2025-06-04 17:17:22\",\"user\":\"Russelcrowe4\"}");
+}
+
+void turnOnPumpWithTimer(int pumpId, unsigned long duration) {
+  if (emergencyStopActive) {
+    Serial.println("{\"error\":\"Emergency stop active\",\"pump\":" + String(pumpId + 1) + "}");
+    return;
+  }
+  
+  digitalWrite(PUMP_PINS[pumpId], HIGH);
+  pumpStates[pumpId] = true;
+  pumpStartTimes[pumpId] = millis();
+  pumpTimers[pumpId] = millis() + duration;
+  
+  Serial.println("{\"pump_timer\":" + String(pumpId + 1) + ",\"name\":\"" + PUMP_NAMES[pumpId] + "\",\"duration\":" + String(duration) + ",\"time\":\"2025-06-04 17:17:22\",\"user\":\"Russelcrowe4\"}");
+}
+
+void handlePumpTimers() {
+  unsigned long currentTime = millis();
+  
+  for (int i = 0; i < NUM_PUMPS; i++) {
+    if (pumpStates[i] && pumpTimers[i] > 0 && currentTime >= pumpTimers[i]) {
+      turnOffPump(i);
+      Serial.println("{\"pump_timer_finished\":" + String(i + 1) + ",\"name\":\"" + PUMP_NAMES[i] + "\"}");
+    }
+  }
+}
+
+void stopAllPumps() {
+  for (int i = 0; i < NUM_PUMPS; i++) {
+    if (pumpStates[i]) {
+      digitalWrite(PUMP_PINS[i], LOW);
+      pumpStates[i] = false;
+      pumpTimers[i] = 0;
+    }
+  }
+  
+  Serial.println("{\"message\":\"Alle Pumpen gestoppt für Russelcrowe4\",\"time\":\"2025-06-04 17:17:22\"}");
+}
+
+// ===== EMERGENCY STOP =====
+void emergencyStopISR() {
+  emergencyStopActive = true;
+}
+
+void triggerEmergencyStop() {
+  emergencyStopActive = true;
+  handleEmergencyStop();
+}
+
+void handleEmergencyStop() {
+  // Alle Pumpen sofort stoppen
+  stopAllPumps();
+  
+  // Status LED schnell blinken
+  digitalWrite(STATUS_LED_PIN, LOW);
+  
+  Serial.println("{\"emergency_stop\":true,\"time\":\"2025-06-04 17:17:22\",\"user\":\"Russelcrowe4\",\"message\":\"🚨 NOTFALL-STOPP AKTIVIERT - Alle Pumpen gestoppt\"}");
+}
+
+void resetEmergencyStop() {
+  emergencyStopActive = false;
+  digitalWrite(STATUS_LED_PIN, HIGH); // LED wieder an
+  
+  Serial.println("{\"emergency_reset\":true,\"time\":\"2025-06-04 17:17:22\",\"user\":\"Russelcrowe4\",\"message\":\"✅ Emergency Stop zurückgesetzt - System bereit\"}");
+}
+
+// ===== HILFSFUNKTIONEN =====
+void handleHeartbeat() {
+  // Status LED als Heartbeat blinken lassen (alle 2 Sekunden)
+  if (!emergencyStopActive && millis() - lastHeartbeat > 2000) {
+    digitalWrite(STATUS_LED_PIN, LOW);
+    delay(50);
+    digitalWrite(STATUS_LED_PIN, HIGH);
+    lastHeartbeat = millis();
+  }
+}
+
+bool areAnyPumpsRunning() {
+  for (int i = 0; i < NUM_PUMPS; i++) {
+    if (pumpStates[i]) return true;
+  }
+  return false;
+}
+
+void sendSystemStatus() {
+  unsigned long uptime = millis() - systemStartTime;
+  int runningPumps = 0;
+  
+  for (int i = 0; i < NUM_PUMPS; i++) {
+    if (pumpStates[i]) runningPumps++;
+  }
+  
+  Serial.print("{\"system_status\":{");
+  Serial.print("\"uptime\":" + String(uptime) + ",");
+  Serial.print("\"running_pumps\":" + String(runningPumps) + ",");
+  Serial.print("\"total_pumps\":" + String(NUM_PUMPS) + ",");
+  Serial.print("\"emergency_stop\":" + String(emergencyStopActive ? "true" : "false") + ",");
+  Serial.print("\"free_memory\":" + String(freeMemory()) + ",");
+  Serial.print("\"time\":\"2025-06-04 17:17:22\",");
+  Serial.print("\"user\":\"Russelcrowe4\",");
+  Serial.print("\"hardware\":\"Arduino Mega 2560\",");
+  Serial.print("\"version\":\"6.0.0-Simplified\"");
+  
+  // Pumpen-Details
+  Serial.print(",\"pumps\":[");
+  for (int i = 0; i < NUM_PUMPS; i++) {
+    Serial.print("{");
+    Serial.print("\"id\":" + String(i + 1) + ",");
+    Serial.print("\"name\":\"" + PUMP_NAMES[i] + "\",");
+    Serial.print("\"pin\":" + String(PUMP_PINS[i]) + ",");
+    Serial.print("\"state\":" + String(pumpStates[i] ? "true" : "false"));
+    if (pumpStates[i]) {
+      Serial.print(",\"runtime\":" + String(millis() - pumpStartTimes[i]));
+      if (pumpTimers[i] > 0) {
+        Serial.print(",\"remaining\":" + String(pumpTimers[i] - millis()));
+      }
+    }
+    Serial.print("}");
+    if (i < NUM_PUMPS - 1) Serial.print(",");
+  }
+  Serial.print("]");
+  
+  Serial.println("}}");
+}
+
+// Freier Speicher (für Debugging)
+int freeMemory() {
+  char top;
+  return &top - __brkval;
+}
+
+/*
+ * ===============================================
+ * VEREINFACHTES ANSCHLUSS-SCHEMA für Russelcrowe4:
+ * ===============================================
+ * 
+ * PUMPEN (12V DC mit 10-Kanal Relais-Modul):
+ * Pin 22 -> Relais 1 -> Pumpe 1 (Weißer Rum)
+ * Pin 23 -> Relais 2 -> Pumpe 2 (Gin)
+ * Pin 24 -> Relais 3 -> Pumpe 3 (Vodka)
+ * Pin 25 -> Relais 4 -> Pumpe 4 (Whiskey)
+ * Pin 26 -> Relais 5 -> Pumpe 5 (Tequila)
+ * Pin 27 -> Relais 6 -> Pumpe 6 (Säfte)
+ * Pin 28 -> Relais 7 -> Pumpe 7 (Sirupe)
+ * Pin 29 -> Relais 8 -> Pumpe 8 (Liköre)
+ * Pin 30 -> Relais 9 -> Pumpe 9 (Bitter)
+ * Pin 31 -> Relais 10 -> Pumpe 10 (Sodawasser)
+ * 
+ * CONTROL:
+ * Pin 2 -> Emergency Stop Button (mit Pull-up)
+ * Pin 13 -> Built-in Status LED
+ * 
+ * KOMMUNIKATION:
+ * USB Serial -> Raspberry Pi 4
+ * Baudrate: 9600
+ * Protocol: JSON über Serial
+ * 
+ * STROMVERSORGUNG:
+ * Arduino Mega: 12V DC (über Barrel Jack)
+ * 10-Kanal Relais-Modul: 5V (vom Arduino)
+ * Pumpen: 12V DC @ 0.8A pro Pumpe
+ * Gesamt: ~12A bei 12V
+ * 
+ */
+```
+
+## 🔧 Vereinfachter Python-Code für Raspberry Pi
+
+```python
+#!/usr/bin/env python3
+"""
+Vereinfachte Arduino-Steuerung - Nur Pumpen
+Version: 6.0.0-Simplified
+Build: 2025-06-04 17:17:22 UTC
+User: Russelcrowe4
+"""
+
+import serial
+import json
+import time
+import threading
+from datetime import datetime
+
+class SimplifiedArduinoController:
+    def __init__(self, port='/dev/ttyUSB0', baudrate=9600):
+        self.port = port
+        self.baudrate = baudrate
+        self.serial_connection = None
+        self.connected = False
+        self.data_callback = None
+        
+        # Pumpen-Namen
+        self.pump_names = [
+            "Weißer Rum", "Gin", "Vodka", "Whiskey", "Tequila",
+            "Säfte Mix", "Sirupe", "Liköre", "Bitter", "Sodawasser"
+        ]
+        
+    def connect(self):
+        """Verbindung zum Arduino herstellen"""
+        try:
+            self.serial_connection = serial.Serial(
+                self.port, 
+                self.baudrate, 
+                timeout=1
+            )
+            time.sleep(2)  # Arduino Reset warten
+            
+            # Ping senden
+            response = self.send_command("PING")
+            if response and "PONG" in str(response):
+                self.connected = True
+                print(f"✅ Arduino verbunden für Russelcrowe4: {response}")
+                
+                # Hintergrund-Thread für eingehende Daten
+                self.listen_thread = threading.Thread(target=self.listen_for_data)
+                self.listen_thread.daemon = True
+                self.listen_thread.start()
+                
+                return True
+        except Exception as e:
+            print(f"❌ Arduino Verbindung fehlgeschlagen: {e}")
+            return False
+        
+        return False
+    
+    def send_command(self, command):
+        """Befehl an Arduino senden"""
+        if not self.connected or not self.serial_connection:
+            return None
+            
+        try:
+            self.serial_connection.write(f"{command}\n".encode())
+            self.serial_connection.flush()
+            
+            # Antwort lesen
+            time.sleep(0.1)
+            if self.serial_connection.in_waiting:
+                response = self.serial_connection.readline().decode().strip()
+                try:
+                    return json.loads(response)
+                except:
+                    return response
+        except Exception as e:
+            print(f"❌ Command error: {e}")
+            
+        return None
+    
+    def listen_for_data(self):
+        """Hintergrund-Thread für eingehende Daten"""
+        while self.connected:
+            try:
+                if self.serial_connection.in_waiting:
+                    data = self.serial_connection.readline().decode().strip()
+                    if data:
+                        try:
+                            json_data = json.loads(data)
+                            if self.data_callback:
+                                self.data_callback(json_data)
+                            else:
+                                print(f"📡 Arduino: {json_data}")
+                        except:
+                            print(f"📡 Arduino (raw): {data}")
+                            
+                time.sleep(0.01)
+            except Exception as e:
+                print(f"❌ Listen error: {e}")
+                break
+    
+    # Pumpen-Steuerung
+    def turn_on_pump(self, pump_id):
+        """Pumpe einschalten (dauerhaft)"""
+        return self.send_command(f"PUMP_ON:{pump_id}")
+    
+    def turn_off_pump(self, pump_id):
+        """Pumpe ausschalten"""
+        return self.send_command(f"PUMP_OFF:{pump_id}")
+    
+    def pump_with_timer(self, pump_id, duration_ms):
+        """Pumpe für bestimmte Zeit einschalten"""
+        return self.send_command(f"PUMP_TIMER:{pump_id}:{duration_ms}")
+    
+    def stop_all_pumps(self):
+        """Alle Pumpen stoppen"""
+        return self.send_command("ALL_PUMPS_OFF")
+    
+    def emergency_stop(self):
+        """Notfall-Stopp"""
+        return self.send_command("EMERGENCY_STOP")
+    
+    def emergency_reset(self):
+        """Emergency Reset"""
+        return self.send_command("EMERGENCY_RESET")
+    
+    def get_status(self):
+        """System-Status abrufen"""
+        return self.send_command("STATUS")
+    
+    def mix_cocktail(self, recipe):
+        """
+        Cocktail mixen basierend auf Rezept
+        recipe = [
+            {"pump": 1, "amount_ml": 50},
+            {"pump": 6, "amount_ml": 100},
+            ...
+        ]
+        """
+        print(f"🍹 Mixe Cocktail für Russelcrowe4...")
+        
+        for ingredient in recipe:
+            pump_id = ingredient["pump"]
+            amount_ml = ingredient["amount_ml"]
+            
+            # Berechne Zeit basierend auf Flow-Rate (ca. 50ml/min)
+            duration_ms = int((amount_ml / 50.0) * 60 * 1000)
+            
+            pump_name = self.pump_names[pump_id - 1] if pump_id <= len(self.pump_names) else f"Pumpe {pump_id}"
+            print(f"⚙️ Dosiere {amount_ml}ml {pump_name} ({duration_ms}ms)")
+            
+            self.pump_with_timer(pump_id, duration_ms)
+            time.sleep(duration_ms / 1000.0 + 0.5)  # Warten + Puffer
+        
+        print("✅ Cocktail fertig!")
+    
+    def disconnect(self):
+        """Verbindung trennen"""
+        self.connected = False
+        if self.serial_connection:
+            self.serial_connection.close()
+
+# Test-Programm für Russelcrowe4
+if __name__ == "__main__":
+    print("🍹 Vereinfachtes Arduino Pumpen-System für Russelcrowe4")
+    print("📅 2025-06-04 17:17:22 UTC")
+    
+    arduino = SimplifiedArduinoController()
+    
+    def handle_arduino_data(data):
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        print(f"[{timestamp}] 📡 {data}")
+    
+    arduino.set_data_callback = handle_arduino_data
+    
+    if arduino.connect():
+        try:
+            print("\n🧪 Pumpen-System Test...")
+            
+            # Status abrufen
+            status = arduino.get_status()
+            print(f"📊 Status: {status}")
+            
+            # Beispiel-Cocktail: Rum & Cola
+            print("\n🍹 Mixe Rum & Cola für Russelcrowe4...")
+            rum_cola_recipe = [
+                {"pump": 1, "amount_ml": 50},   # Weißer Rum
+                {"pump": 6, "amount_ml": 150},  # Cola (Säfte Mix)
+            ]
+            
+            arduino.mix_cocktail(rum_cola_recipe)
+            
+            print("\n✅ Test abgeschlossen!")
+            
+        except KeyboardInterrupt:
+            print("\n🛑 Test abgebrochen")
+            arduino.stop_all_pumps()
+        finally:
+            arduino.disconnect()
+    else:
+        print("❌ Arduino nicht erreichbar")
+```
+
+## 🛒 Vereinfachte Hardware-Liste für Russelcrowe4:
+
+```
+🔧 MINIMALE HARDWARE-LISTE:
+
+HAUPTKOMPONENTEN:
+• 1x Arduino Mega 2560 (~25€)
+• 1x Raspberry Pi 4 (2GB) (~75€)
+• 1x 10-Kanal Relais-Modul 12V (~15€)
+• 10x Peristaltik-Pumpen 12V DC (~150€)
+• 1x 12V 12A Netzteil (~30€)
+
+VERKABELUNG:
+• Jumper Wires M-M (~5€)
+• USB-Kabel Arduino->RaspPi (~5€)
+• 12V DC Kabel für Pumpen (~10€)
+• Schraubklemmen (~5€)
+
+OPTIONAL:
+• 1x Emergency Stop Button (~5€)
+• Gehäuse/Montage (~20€)
+
+GESAMT: ~345€
+```
+
+## 📋 Anschluss-Schema:
+
+```
+Arduino Mega 2560:
+Pin 22 -> Relais 1 -> Pumpe 1 (Rum)
+Pin 23 -> Relais 2 -> Pumpe 2 (Gin)
+Pin 24 -> Relais 3 -> Pumpe 3 (Vodka)
+Pin 25 -> Relais 4 -> Pumpe 4 (Whiskey)
+Pin 26 -> Relais 5 -> Pumpe 5 (Tequila)
+Pin 27 -> Relais 6 -> Pumpe 6 (Säfte)
+Pin 28 -> Relais 7 -> Pumpe 7 (Sirupe)
+Pin 29 -> Relais 8 -> Pumpe 8 (Liköre)
+Pin 30 -> Relais 9 -> Pumpe 9 (Bitter)
+Pin 31 -> Relais 10 -> Pumpe 10 (Sodawasser)
+
+Pin 2 -> Emergency Stop Button (optional)
+Pin 13 -> Built-in LED (Status)
+
+USB -> Raspberry Pi 4
+```
+
+**Viel einfacher und günstiger!** 🍹🔧 Das System konzentriert sich nur auf das Wesentliche: **10 Pumpen perfekt steuern für Russelcrowe4!** 🚀
