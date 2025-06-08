@@ -1,0 +1,113 @@
+[
+  {
+    "name": "Mojito",
+    "ingredients": [
+      {"name": "Weißer Rum", "amount": 50, "unit": "ml"},
+      {"name": "Limettensaft", "amount": 30, "unit": "ml"},
+      {"name": "Zucker", "amount": 2, "unit": "TL"},
+      {"name": "Minze", "amount": 6, "unit": "Blätter"},
+      {"name": "Sodawasser", "amount": 100, "unit": "ml"}
+    ],
+    "category": "Klassiker",
+    "alcohol": true
+  },
+  {
+    "name": "Caipirinha",
+    "ingredients": [
+      {"name": "Cachaça", "amount": 50, "unit": "ml"},
+      {"name": "Limette", "amount": 1, "unit": "Stück"},
+      {"name": "Zucker", "amount": 2, "unit": "TL"},
+      {"name": "Crushed Ice", "amount": 1, "unit": "Handvoll"}
+    ],
+    "category": "Klassiker",
+    "alcohol": true
+  },
+  {
+    "name": "Pina Colada",
+    "ingredients": [
+      {"name": "Weißer Rum", "amount": 40, "unit": "ml"},
+      {"name": "Kokoscreme", "amount": 30, "unit": "ml"},
+      {"name": "Ananassaft", "amount": 90, "unit": "ml"}
+    ],
+    "category": "Tropical",
+    "alcohol": true
+  },
+  {
+    "name": "Tequila Sunrise",
+    "ingredients": [
+      {"name": "Tequila", "amount": 40, "unit": "ml"},
+      {"name": "Orangensaft", "amount": 100, "unit": "ml"},
+      {"name": "Grenadine", "amount": 10, "unit": "ml"}
+    ],
+    "category": "Klassiker",
+    "alcohol": true
+  },
+  {
+    "name": "Sex on the Beach",
+    "ingredients": [
+      {"name": "Wodka", "amount": 40, "unit": "ml"},
+      {"name": "Pfirsichlikör", "amount": 20, "unit": "ml"},
+      {"name": "Orangensaft", "amount": 40, "unit": "ml"},
+      {"name": "Cranberrysaft", "amount": 40, "unit": "ml"}
+    ],
+    "category": "Tropical",
+    "alcohol": true
+  },
+  {
+    "name": "Mai Tai",
+    "ingredients": [
+      {"name": "Weißer Rum", "amount": 30, "unit": "ml"},
+      {"name": "Brauner Rum", "amount": 30, "unit": "ml"},
+      {"name": "Orangenlikör", "amount": 15, "unit": "ml"},
+      {"name": "Limettensaft", "amount": 20, "unit": "ml"},
+      {"name": "Mandelsirup", "amount": 10, "unit": "ml"}
+    ],
+    "category": "Tropical",
+    "alcohol": true
+  },
+  {
+    "name": "Cuba Libre",
+    "ingredients": [
+      {"name": "Weißer Rum", "amount": 50, "unit": "ml"},
+      {"name": "Cola", "amount": 120, "unit": "ml"},
+      {"name": "Limette", "amount": 1, "unit": "Stück"}
+    ],
+    "category": "Klassiker",
+    "alcohol": true
+  },
+  {
+    "name": "Gin Tonic",
+    "ingredients": [
+      {"name": "Gin", "amount": 40, "unit": "ml"},
+      {"name": "Tonic Water", "amount": 120, "unit": "ml"},
+      {"name": "Limette", "amount": 1, "unit": "Stück"}
+    ],
+    "category": "Klassiker",
+    "alcohol": true
+  },
+  {
+    "name": "Long Island Iced Tea",
+    "ingredients": [
+      {"name": "Wodka", "amount": 15, "unit": "ml"},
+      {"name": "Gin", "amount": 15, "unit": "ml"},
+      {"name": "Rum", "amount": 15, "unit": "ml"},
+      {"name": "Tequila", "amount": 15, "unit": "ml"},
+      {"name": "Triple Sec", "amount": 15, "unit": "ml"},
+      {"name": "Zitronensaft", "amount": 20, "unit": "ml"},
+      {"name": "Cola", "amount": 60, "unit": "ml"}
+    ],
+    "category": "Stark",
+    "alcohol": true
+  },
+  {
+    "name": "Cosmopolitan",
+    "ingredients": [
+      {"name": "Wodka", "amount": 40, "unit": "ml"},
+      {"name": "Cointreau", "amount": 15, "unit": "ml"},
+      {"name": "Limettensaft", "amount": 15, "unit": "ml"},
+      {"name": "Cranberrysaft", "amount": 30, "unit": "ml"}
+    ],
+    "category": "Modern",
+    "alcohol": true
+  }
+]
