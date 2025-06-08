@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>🍹 Ultimate AI Cocktailmaschine v7.0 - Production Ready Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Roboto+Slab:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/workspaces/Russelcrowe4/style.css">
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loadingScreen" class="loading-screen">
+        <div class="loading-content">
+            <div class="loading-logo">🤖🍹</div>
+            <div class="loading-title">Ultimate AI Cocktailmaschine</div>
+            <div class="loading-subtitle">Production Ready Edition v7.0</div>
+            <div class="loading-progress">
+                <div class="loading-progress-fill" id="loadingProgressFill"></div>
+            </div>
+            <div class="loading-status" id="loadingStatus">System wird initialisiert...</div>
+        </div>
+    </div>
+
+    <!-- System Status Banner -->
+    <div id="systemBanner" class="system-banner">
+        <div class="banner-content">
+            <span class="banner-icon">⚠️</span>
+            <span class="banner-text" id="bannerText">System-Meldung</span>
+            <button class="banner-close" id="bannerClose">&times;</button>
+        </div>
+    </div>
+
+    <!-- Main Application (nur Grundstruktur, Seiten werden dynamisch geladen) -->
+    <div id="mainApp">
+        <!-- Navigation -->
+        <nav class="nav-menu" id="navMenu">
+            <div class="nav-header">
+                <h3>🍹 AI Cocktailmaschine v7.0</h3>
+                <button class="nav-close" id="navClose">&times;</button>
+            </div>
+            <div class="nav-content" id="navContent">
+                <!-- Navigation wird dynamisch befüllt -->
+            </div>
+        </nav>
+        <div class="nav-overlay" id="navOverlay"></div>
+
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <button class="header-btn" id="menuBtn">☰ Menü</button>
+                <button class="header-btn emergency" id="emergencyBtn">🚨 Notfall</button>
+            </div>
+            <div class="header-center">
+                <h1>🤖 AI Cocktailmaschine Professional</h1>
+                <div class="header-info">
+                    <span id="systemVersion">v7.0 Production</span> | 
+                    <span id="currentUser">Russelcrowe4</span> | 
+                    <span id="currentTime">2025-05-25 19:49:04 UTC</span>
+                </div>
+            </div>
+            <div class="header-right">
+                <button class="header-btn" id="statusBtn">📊 Status</button>
+                <button class="header-btn danger" id="logoutBtn">🚪 Logout</button>
+            </div>
+        </header>
+
+        <!-- Main Content Area: Nur Container, Seiten werden dynamisch geladen -->
+        <main class="main-content">
+            <div id="pageContainer" class="page-container">
+                <!-- Seiteninhalte werden per JS geladen -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+    <!-- Modal Container -->
+    <div class="modal-container" id="modalContainer"></div>
+
+    <script src="/workspaces/Russelcrowe4/app.js" type="module"></script>
+</body>
+</html>
